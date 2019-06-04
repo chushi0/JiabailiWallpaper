@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">珈百璃动态壁纸</string>
+    <string name="ui_success">珈百璃壁纸已启用</string>
+    <string name="ui_fail">珈百璃壁纸未启用</string>
+    <string name="ui_set">立即启用珈百璃壁纸</string>
+</resources>
