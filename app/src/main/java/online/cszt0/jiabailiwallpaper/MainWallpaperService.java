@@ -73,7 +73,7 @@ public final class MainWallpaperService extends WallpaperService {
 			handler.post(this);
 			SurfaceHolder surfaceHolder = getSurfaceHolder();
 			// 当前帧
-			int updateFrameNumber = (int) ((SystemClock.currentThreadTimeMillis() - startTime) / 50);
+			int updateFrameNumber = (int) ((SystemClock.currentThreadTimeMillis() - startTime) / 20);
 			// 刷新角色信息
 			if (updateFrameNumber - lastAddActorFrame > 30) {
 				actors.add(new Actor(updateFrameNumber));
