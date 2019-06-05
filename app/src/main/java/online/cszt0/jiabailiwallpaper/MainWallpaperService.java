@@ -13,6 +13,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.util.DisplayMetrics;
@@ -25,20 +26,22 @@ public final class MainWallpaperService extends WallpaperService {
 		return new WallpaperEngine();
 	}
 	class WallpaperEngine extends Engine implements Runnable {
-		private Handler handler;
+		private Thread thread;
+		private volatile Looper looper;
+		private volatile Handler handler;
 		private boolean run;
 		private Paint paint;
-		private float offset;
+		private volatile float offset;
 		private Bitmap background;
 		private Bitmap actor;
 		private long startTime;
 		private ArrayList<Actor> actors;
 		private int lastAddActorFrame;
+		private int width, height;
 
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
 			super.onCreate(surfaceHolder);
-			handler = new Handler();
 			paint = new Paint();
 			paint.setAntiAlias(true);
 			actors = new ArrayList<>();
@@ -49,6 +52,28 @@ public final class MainWallpaperService extends WallpaperService {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
+			final Object lock = new Object();
+			synchronized (lock) {
+				thread = new Thread() {
+					@Override
+					public void run() {
+						super.run();
+						synchronized (lock) {
+							Looper.prepare();
+							looper = Looper.myLooper();
+							handler = new Handler();
+							lock.notify();
+						}
+						Looper.loop();
+					}
+				};
+				thread.start();
+				try {
+					lock.wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 
 		@Override
@@ -56,6 +81,11 @@ public final class MainWallpaperService extends WallpaperService {
 			super.onVisibilityChanged(visible);
 			run = visible;
 			if (visible) {
+				DisplayMetrics displayMetrics = new DisplayMetrics();
+				((WindowManager) Objects.requireNonNull(getSystemService(WINDOW_SERVICE))).getDefaultDisplay()
+						.getRealMetrics(displayMetrics);
+				width = displayMetrics.widthPixels;
+				height = displayMetrics.heightPixels;
 				startTime = SystemClock.currentThreadTimeMillis();
 				handler.post(this);
 				actors.add(new Actor(0));
@@ -87,11 +117,8 @@ public final class MainWallpaperService extends WallpaperService {
 				}
 			}
 			// 屏幕宽高
-			DisplayMetrics displayMetrics = new DisplayMetrics();
-			((WindowManager) Objects.requireNonNull(getSystemService(WINDOW_SERVICE))).getDefaultDisplay()
-					.getRealMetrics(displayMetrics);
-			int width = displayMetrics.widthPixels;
-			int height = displayMetrics.heightPixels;
+			int width = this.width;
+			int height = this.height;
 			// 背景图宽高
 			int backgroundWidth = background.getWidth();
 			int backgroundHeight = background.getHeight();
@@ -125,6 +152,7 @@ public final class MainWallpaperService extends WallpaperService {
 		@Override
 		public void onDestroy() {
 			super.onDestroy();
+			looper.quit();
 			background.recycle();
 			actor.recycle();
 		}
